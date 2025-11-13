@@ -17,22 +17,51 @@ jobs:
         run: |
           echo "Triggering daily scrape..."
 
-          # Note: Replace this with actual scrape endpoint when implemented
-          # For now, just ping to ensure API is awake and ready
+          # Trigger the admin scrape endpoint
           response=$(curl -s -w "\n%{http_code}" \
+            -X POST \
             -H "X-API-Key: $API_KEY" \
-            https://irish-mortgage-api.onrender.com/api/v1/rates)
+            https://irish-mortgage-api.onrender.com/api/v1/admin/scrape)
 
           status_code=$(echo "$response" | tail -n1)
           body=$(echo "$response" | head -n-1)
 
           if [ "$status_code" -eq 200 ]; then
             echo "✓ Scrape triggered successfully (HTTP $status_code)"
-            echo "$body" | jq -r '.count' | xargs -I {} echo "Found {} mortgage products"
+            echo "$body" | jq -r '.message'
           else
             echo "✗ Scrape failed (HTTP $status_code)"
             echo "$body"
             exit 1
+          fi
+
+      - name: Wait for scrape to complete
+        run: |
+          echo "Waiting 60 seconds for scrape to complete..."
+          sleep 60
+
+      - name: Verify fresh data
+        env:
+          API_KEY: ${{ secrets.MORTGAGE_API_KEY }}
+        run: |
+          echo "Verifying fresh data..."
+
+          response=$(curl -s \
+            -H "X-API-Key: $API_KEY" \
+            https://irish-mortgage-api.onrender.com/health)
+
+          echo "$response" | jq '.'
+
+          product_count=$(echo "$response" | jq -r '.total_products')
+          data_age=$(echo "$response" | jq -r '.data_age_hours')
+
+          echo "Products: $product_count"
+          echo "Data age: $data_age hours"
+
+          if [ "$product_count" -gt 10 ]; then
+            echo "✓ Fresh data available ($product_count products)"
+          else
+            echo "⚠ Warning: Only $product_count products found"
           fi
 
       - name: Log completion
