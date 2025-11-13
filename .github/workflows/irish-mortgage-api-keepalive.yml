@@ -1,0 +1,28 @@
+name: Irish Mortgage API - Keep Alive
+
+on:
+  schedule:
+    # Every 5 minutes, 24/7
+    - cron: '*/5 * * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping health endpoint
+        run: |
+          echo "Pinging Irish Mortgage API..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://irish-mortgage-api.onrender.com/health)
+
+          if [ "$response" -eq 200 ]; then
+            echo "✓ API is healthy (HTTP $response)"
+          else
+            echo "✗ API returned HTTP $response"
+            exit 1
+          fi
+
+      - name: Log status
+        run: |
+          echo "Keep-alive ping completed at $(date -u +"%Y-%m-%d %H:%M:%S UTC")"

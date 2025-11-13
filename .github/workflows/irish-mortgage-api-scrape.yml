@@ -1,0 +1,40 @@
+name: Irish Mortgage API - Daily Scrape
+
+on:
+  schedule:
+    # Daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger scrape endpoint
+        env:
+          API_KEY: ${{ secrets.MORTGAGE_API_KEY }}
+        run: |
+          echo "Triggering daily scrape..."
+
+          # Note: Replace this with actual scrape endpoint when implemented
+          # For now, just ping to ensure API is awake and ready
+          response=$(curl -s -w "\n%{http_code}" \
+            -H "X-API-Key: $API_KEY" \
+            https://irish-mortgage-api.onrender.com/api/v1/rates)
+
+          status_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+
+          if [ "$status_code" -eq 200 ]; then
+            echo "✓ Scrape triggered successfully (HTTP $status_code)"
+            echo "$body" | jq -r '.count' | xargs -I {} echo "Found {} mortgage products"
+          else
+            echo "✗ Scrape failed (HTTP $status_code)"
+            echo "$body"
+            exit 1
+          fi
+
+      - name: Log completion
+        run: |
+          echo "Daily scrape completed at $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
